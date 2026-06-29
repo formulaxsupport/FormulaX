@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>FormulaX - Galerie</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-left">
+            <img src="bilder/logo.jpg" alt="FormulaX Logo" class="logo-img">
+            <span class="role-badge" id="user-role-display">...</span>
+        </div>
+        <div>
+            <p> FormulaX Beta
+            </p>
+        </div>
+        <div class="nav-right">
+            <a href="index.html">Home</a>
+            <a href="editor.html">Editor</a>
+            <a href="classroom.html">Classroom</a>
+            <a href="gallerie.html" class="active">Galerie</a>
+            <button class="logout-btn" id="logout-btn">Logout</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h1>🌐 Öffentliche Projektgalerie</h1>
+        <input type="text" id="gallery-search" class="search-input" placeholder="🔍 Nach Themen oder Erstellern suchen..." oninput="searchGallery()">
+
+        <div class="grid-3" id="gallery-grid">Lade Galerie...</div>
+    </main>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbySow-kXXtEjavDSwOQE5I1kXbx1OoutxaaDU3IxT6Lz0AkDzthlRQvBe72z-2_A1Tt/exec";
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            const user = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+            if(!user.username) { window.location.href="login.html"; return; }
+            document.getElementById("user-role-display").innerText = user.role;
+            
+            const res = await fetch(API_URL, { method:"POST", body: JSON.stringify({ action:"loadQuizzes", username: user.username }) });
+            const data = await res.json();
+            if(data.success) {
+                const grid = document.getElementById("gallery-grid");
+                grid.innerHTML = "";
+                data.quizzes.forEach(q => {
+                    if(q.visibility === "oeffentlich") {
+                        grid.innerHTML += `<div class="card gallery-item"><h3>${q.title}</h3><p style="font-size:0.9rem; color:#64748b; margin:10px 0;">Erstellt von: ${q.creator}</p><button class="btn" style="width:100%" onclick='alert("Starte das Quiz über deine Startseite!")'>Verfügbar auf Home</button></div>`;
+                    }
+                });
+            }
+        });
+
+        function searchGallery() {
+            const query = document.getElementById("gallery-search").value.toLowerCase();
+            const items = document.querySelectorAll(".gallery-item");
+            items.forEach(item => {
+                if(item.innerText.toLowerCase().includes(query)) item.style.display = "block";
+                else item.style.display = "none";
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>FormulaX - Classroom</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-left">
+            <img src="bilder/logo.jpg" alt="FormulaX Logo" class="logo-img">
+            <span class="role-badge" id="user-role-display">...</span>
+        </div>
+        <div>
+            <p> FormulaX Beta
+            </p>
+        </div>
+        <div class="nav-right">
+            <a href="index.html">Home</a>
+            <a href="editor.html">Editor</a>
+            <a href="classroom.html" class="active">Classroom</a>
+            <a href="gallerie.html">Galerie</a>
+            <button class="logout-btn" id="logout-btn">Logout</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h1>🏫 Eure Klassen & Kurse</h1>
+        
+        <div class="card" id="lehrer-create-zone" style="display:none;">
+            <h2>🛠️ Neue Klasse gründen (Nur für Lehrkräfte & Admins)</h2>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <input type="text" id="new-class-name" class="search-input" placeholder="Name der Klasse (z.B. Klasse 10A)" style="margin:0;">
+                <button class="btn" style="margin:0; background:#10b981;" onclick="createNewClass()">Gründen</button>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div>
+                <div class="card">
+                    <h2>Aktive Kursauswahl</h2>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="active-class-dropdown" class="search-input" style="background:white; font-weight:bold; margin:0; flex-grow: 1;"></select>
+                        <button id="delete-class-btn" class="btn-danger-sm" style="display:none; height: 40px; padding: 0 15px;" onclick="deleteCurrentClass()">🗑️ Kurs auflösen</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>📌 Zugeordnete Quizzes für diese Klasse</h2>
+                    <ul class="project-list" id="pinned-quizzes"></ul>
+                    
+                    <div id="lehrer-pin-actions" style="display:none; margin-top:15px; border-top:1px solid #e2e8f0; padding-top:15px;">
+                        <h3>Aufgabe anpinnen</h3>
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <select id="quiz-to-pin-dropdown" class="search-input" style="background:white; margin:0; flex-grow: 1;"></select>
+                            <button class="btn" style="margin:0;" onclick="pinQuiz()">Anpinnen</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <h2>👥 Mitglieder (<span id="member-count">0</span>)</h2>
+                    <ul class="member-list" id="class-members-box"></ul>
+
+                    <div id="lehrer-search-zone" style="display:none; margin-top:20px; border-top:1px solid #e2e8f0; padding-top:15px;">
+                        <h3>➕ Schüler hinzufügen</h3>
+                        <input type="text" id="student-search-bar" class="search-input" placeholder="Name eingeben..." oninput="filterStudents()">
+                        <div id="search-results-box" style="max-height:150px; overflow-y:auto; background:#f1f5f9; border-radius:4px; margin-top: 5px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbySow-kXXtEjavDSwOQE5I1kXbx1OoutxaaDU3IxT6Lz0AkDzthlRQvBe72z-2_A1Tt/exec";
+        let currentUser = {};
+        let allSystemStudents = [];
+        let allClassData = [];
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+            if(!currentUser.username) { window.location.href="login.html"; return; }
+            document.getElementById("user-role-display").innerText = currentUser.role;
+
+            if(currentUser.role !== "schueler") {
+                document.getElementById("lehrer-create-zone").style.display = "block";
+                document.getElementById("lehrer-pin-actions").style.display = "block";
+                document.getElementById("lehrer-search-zone").style.display = "block";
+                // Wichtig: Warten, bis alle Schüler geladen sind
+                await loadAllStudentsForTeacher();
+                loadQuizzesForPinning();
+            }
+
+            await buildClassDropdown();
+        });
+
+        async function buildClassDropdown() {
+            const dropdown = document.getElementById("active-class-dropdown");
+            dropdown.innerHTML = "";
+            
+            const res = await fetch(API_URL, { method:"POST", body: JSON.stringify({ action: "loadClasses" }) });
+            const data = await res.json();
+            if(data.success) allClassData = data.classes;
+
+            let classes = [];
+            if (currentUser.role === "admin") {
+                classes = allClassData.map(c => c.className);
+            } else {
+                classes = currentUser.groupId ? currentUser.groupId.split(",").map(g => g.trim()) : ["keine"];
+            }
+
+            if(classes.length === 0 || (classes.length === 1 && classes[0] === "keine")) {
+                let opt = document.createElement("option");
+                opt.value = "keine"; opt.innerText = "Keine aktiven Kurse";
+                dropdown.appendChild(opt);
+                loadClassDetails("keine");
+                toggleDeleteButton("keine");
+                return;
+            }
+
+            classes.forEach(c => {
+                let opt = document.createElement("option"); opt.value = c; opt.innerText = c; 
+                dropdown.appendChild(opt);
+            });
+
+            dropdown.addEventListener("change", (e) => {
+                loadClassDetails(e.target.value);
+                toggleDeleteButton(e.target.value);
+            });
+
+            loadClassDetails(classes[0]);
+            toggleDeleteButton(classes[0]);
+        }
+
+        function toggleDeleteButton(selectedClass) {
+            const deleteBtn = document.getElementById("delete-class-btn");
+            if(currentUser.role === "schueler" || selectedClass === "keine") {
+                deleteBtn.style.display = "none";
+                return;
+            }
+            const classObj = allClassData.find(c => c.className === selectedClass);
+            if(currentUser.role === "admin" || (classObj && classObj.creator === currentUser.username)) {
+                deleteBtn.style.display = "block";
+            } else {
+                deleteBtn.style.display = "none";
+            }
+        }
+
+        async function loadClassDetails(className) {
+            const memberList = document.getElementById("class-members-box");
+            if(className === "keine") {
+                memberList.innerHTML = "<li>Tritt einem Kurs bei, um deine Klasse zu sehen.</li>";
+                document.getElementById("member-count").innerText = "0";
+                document.getElementById("pinned-quizzes").innerHTML = "<li>Keine Aufgaben zugeordnet.</li>";
+                return;
+            }
+
+            memberList.innerHTML = "<li>Mitglieder werden geladen...</li>";
+            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getLeaderboard", groupId: className }) });
+            const data = await res.json();
+            
+            if(data.success) {
+                memberList.innerHTML = "";
+                document.getElementById("member-count").innerText = data.leaderboard.length;
+                data.leaderboard.forEach(student => {
+                    let li = document.createElement("li"); li.className = "member-item";
+                    let actionBtn = (currentUser.role !== "schueler") ? `<button class="btn-danger-sm" onclick="manageGroup('${student.username}', 'kick')">Kicken</button>` : '';
+                    li.innerHTML = `<div><strong>${student.username}</strong><br><span style="font-size:0.8rem;color:#64748b;">${student.xp} XP</span></div>${actionBtn}`;
+                    memberList.appendChild(li);
+                });
+            }
+            loadPinnedQuizzes(className);
+        }
+
+        async function loadPinnedQuizzes(className) {
+            const list = document.getElementById("pinned-quizzes");
+            list.innerHTML = "<li>Zuweisungen werden gesucht...</li>";
+            
+            const currentClassData = allClassData.find(c => c.className === className);
+            if(currentClassData && currentClassData.pinned.length > 0) {
+                const qRes = await fetch(API_URL, { method:"POST", body: JSON.stringify({ action: "loadQuizzes", username: currentUser.username }) });
+                const qData = await qRes.json();
+                list.innerHTML = "";
+                
+                currentClassData.pinned.forEach(pId => {
+                    let quiz = qData.quizzes.find(q => q.id === pId);
+                    if(quiz) {
+                        list.innerHTML += `<li class="project-item"><div><strong>📌 ${quiz.title}</strong></div><button class="btn btn-sm" onclick='window.location.href="index.html"'>Absolvieren</button></li>`;
+                    }
+                });
+                if(list.innerHTML === "") list.innerHTML = "<li>Zugeordnete Quizzes wurden gelöscht.</li>";
+            } else { 
+                list.innerHTML = "<li>Keine angepinnten Aufgaben für diese Klasse.</li>"; 
+            }
+        }
+
+        async function loadQuizzesForPinning() {
+            const dropdown = document.getElementById("quiz-to-pin-dropdown");
+            const res = await fetch(API_URL, { method:"POST", body: JSON.stringify({ action:"loadQuizzes", username: currentUser.username }) });
+            const data = await res.json();
+            if(data.success) {
+                dropdown.innerHTML = "";
+                data.quizzes.forEach(q => {
+                    if(q.creator === currentUser.username || currentUser.role === "admin") {
+                        dropdown.innerHTML += `<option value="${q.id}">${q.title}</option>`;
+                    }
+                });
+            }
+        }
+
+        async function loadAllStudentsForTeacher() {
+            try {
+                const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "searchAllStudents" }) });
+                const data = await res.json(); 
+                if(data.success) {
+                    allSystemStudents = data.students;
+                }
+            } catch (err) {
+                console.error("Fehler beim Laden der Schülerliste:", err);
+            }
+        }
+
+        function filterStudents() {
+            const query = document.getElementById("student-search-bar").value.toLowerCase();
+            const box = document.getElementById("search-results-box"); 
+            box.innerHTML = ""; 
+            
+            if(!query) return;
+            
+            let found = false;
+            allSystemStudents.forEach(st => {
+                if(st.username.toLowerCase().includes(query)) {
+                    found = true;
+                    box.innerHTML += `<div style="padding:8px; border-bottom:1px solid #cbd5e1; display:flex; justify-content:space-between; align-items:center; background: white;"><span>${st.username}</span><button class="btn btn-sm" style="margin:0;" onclick="manageGroup('${st.username}', 'add')">Hinzufügen</button></div>`;
+                }
+            });
+
+            if(!found) {
+                box.innerHTML = `<div style="padding:8px; color:#64748b; background: white;">Kein Schüler mit diesem Namen gefunden.</div>`;
+            }
+        }
+
+        async function manageGroup(user, op) {
+            const activeClass = document.getElementById("active-class-dropdown").value;
+            if(activeClass === "keine") return alert("Wähle einen gültigen Kurs aus!");
+            await fetch(API_URL, { method:"POST", body: JSON.stringify({ action:"updateStudentGroup", username: user, className: activeClass, operation: op }) });
+            alert("Klassenzugehörigkeit aktualisiert!");
+            
+            // Textfeld leeren und Box schließen
+            document.getElementById("student-search-bar").value = "";
+            document.getElementById("search-results-box").innerHTML = "";
+            
+            // Ansicht aktualisieren
+            await buildClassDropdown();
+        }
+
+        async function createNewClass() {
+            const name = document.getElementById("new-class-name").value;
+            if(!name) return alert("Bitte gib einen Kursnamen ein!");
+            const res = await fetch(API_URL, { method:"POST", body: JSON.stringify({ action:"createClassByTeacher", teacherName: currentUser.username, className: name }) });
+            const result = await res.json();
+            
+            if(result.success) {
+                if(currentUser.role !== "admin") currentUser.groupId = result.newGroups;
+                sessionStorage.setItem("currentUser", JSON.stringify(currentUser));
+                alert(`Kurs "${name}" erfolgreich gegründet!`);
+                window.location.reload();
+            } else {
+                alert("Fehler: " + result.message);
+            }
+        }
+
+        async function deleteCurrentClass() {
+            const className = document.getElementById("active-class-dropdown").value;
+            if(!className || className === "keine") return;
+
+            if(!confirm(`Möchtest du den Kurs "${className}" wirklich komplett auflösen? Alle Verknüpfungen und Schüler-Zuweisungen werden gelöscht!`)) return;
+
+            try {
+                const res = await fetch(API_URL, { 
+                    method: "POST", 
+                    body: JSON.stringify({ action: "deleteClass", className: className, username: currentUser.username }) 
+                });
+                const result = await res.json();
+
+                if(result.success) {
+                    alert(`Kurs "${className}" wurde erfolgreich gelöscht.`);
+                    
+                    if(currentUser.role !== "admin" && currentUser.groupId) {
+                        let groups = currentUser.groupId.split(",").map(g => g.trim());
+                        groups = groups.filter(g => g !== className);
+                        currentUser.groupId = groups.length === 0 ? "keine" : groups.join(",");
+                        sessionStorage.setItem("currentUser", JSON.stringify(currentUser));
+                    }
+                    window.location.reload();
+                } else {
+                    alert("Fehler: " + result.message);
+                }
+            } catch(e) {
+                alert("Fehler beim Löschen der Klasse.");
+            }
+        }
+
+        document.getElementById("logout-btn").addEventListener("click", () => { sessionStorage.clear(); window.location.href="login.html"; });
+    </script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+body { background-color: #f0f2f5; color: #1e293b; padding-top: 80px; }
+.container { max-width: 1300px; margin: 0 auto; padding: 20px; }
+
+/* === NAVBAR === */
+.navbar { position: fixed; top: 0; left: 0; width: 100%; height: 70px; background-color: #0f172a; color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.nav-left { display: flex; align-items: center; gap: 15px; }
+.logo-img { height: 45px; width: auto; border-radius: 6px; }
+.role-badge { background-color: #3b82f6; padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+.nav-right { display: flex; align-items: center; gap: 20px; }
+.nav-right a { color: #94a3b8; text-decoration: none; font-weight: 500; transition: color 0.2s; }
+.nav-right a.active, .nav-right a:hover { color: #fff; }
+.logout-btn { background-color: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; transition: background 0.2s; }
+.logout-btn:hover { background-color: #dc2626; }
+
+/* === DASHBOARD LAYOUT === */
+.dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-top: 20px; }
+@media (max-width: 900px) { .dashboard-grid { grid-template-columns: 1fr; } }
+.card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 24px; border: 1px solid #e2e8f0; }
+.card h2 { margin-bottom: 18px; color: #0f172a; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; font-size: 1.4rem; }
+.btn { display: inline-block; background: #3b82f6; color: white; text-decoration: none; padding: 12px 20px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; text-align: center; }
+.btn:hover { background: #2563eb; transform: translateY(-1px); }
+.btn-sm { padding: 6px 12px; font-size: 0.85rem; border-radius: 6px; }
+.search-input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 16px; font-size: 1rem; transition: all 0.2s; }
+.search-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+.project-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 12px; }
+.badge-private { background: #64748b; color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+.badge-public { background: #10b981; color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+.btn-danger-sm { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+.grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+
+/* === PREMIUM DARK EDITOR CARD === */
+.editor-card-dark { background: #1e293b; color: #f8fafc; border-radius: 16px; padding: 30px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); border: 1px solid #334155; }
+.editor-card-dark h2 { color: #fff; border-bottom: 2px solid #334155; padding-bottom: 12px; margin-bottom: 20px; }
+.editor-card-dark .search-input { background: #0f172a; border: 1px solid #334155; color: #fff; }
+.editor-card-dark .search-input:focus { border-color: #3b82f6; }
+
+/* === FRAGEN-STAGE IM EDITOR === */
+.question-builder-item { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 16px; transition: border 0.2s; }
+.question-builder-item.active-edit { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.3); }
+
+/* === RIESIGES, IMMERSIVES QUIZ & CONTENT MODAL === */
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; animation: fadeIn 0.3s forwards; }
+.modal-content { background: #1e293b; color: #f8fafc; padding: 40px; border-radius: 24px; max-width: 950px; width: 95%; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); position: relative; transform: scale(0.9); animation: scaleUp 0.3s forwards; max-height: 90vh; overflow-y: auto; }
+
+.quiz-progress-bar { width: 100%; height: 10px; background: #334155; border-radius: 5px; margin-bottom: 25px; overflow: hidden; }
+.quiz-progress-fill { height: 100%; width: 0%; background: #3b82f6; transition: width 0.3s ease; }
+
+/* Medien & Video Container */
+.media-container { width: 100%; max-width: 640px; margin: 0 auto 20px auto; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); background: #000; }
+.media-container iframe { width: 100%; height: 100%; border: none; }
+.explanation-box { background: #0f172a; border: 1px solid #334155; padding: 20px; border-radius: 12px; font-size: 1.15rem; text-align: left; line-height: 1.6; color: #e2e8f0; margin-bottom: 25px; max-height: 250px; overflow-y: auto; }
+
+/* Antwort-Buttons im Modal */
+.answer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
+@media (max-width: 600px) { .answer-grid { grid-template-columns: 1fr; } }
+.answer-option { display: block; width: 100%; padding: 18px 24px; background: #0f172a; border: 2px solid #334155; border-radius: 12px; cursor: pointer; text-align: left; font-size: 1.1rem; font-weight: 500; color: #cbd5e1; transition: all 0.2s ease; }
+.answer-option:hover { background: #1e293b; border-color: #475569; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+
+/* Feedback-Overlay */
+.feedback-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; color: white; opacity: 0; transform: scale(0.8); transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: none; }
+.feedback-overlay.show { opacity: 1; transform: scale(1); pointer-events: auto; }
+.feedback-overlay.correct { background: rgba(16, 185, 129, 0.98); }
+.feedback-overlay.wrong { background: rgba(239, 68, 68, 0.98); }
+.feedback-overlay.finish { background: rgba(15, 23, 42, 0.99); }
+
+.feedback-icon { font-size: 5rem; margin-bottom: 15px; animation: bounce 0.5s ease; }
+.feedback-title { font-size: 2.5rem; font-weight: 800; margin-bottom: 10px; }
+.feedback-text { font-size: 1.4rem; margin-bottom: 25px; }
+
+@keyframes fadeIn { to { opacity: 1; } }
+@keyframes scaleUp { to { transform: scale(1); } }
+@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }

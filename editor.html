@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>FormulaX - Quiz Studio</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-left">
+            <img src="bilder/logo.jpg" alt="FormulaX Logo" class="logo-img">
+            <span class="role-badge" id="user-role-display">...</span>
+        </div>
+        <div>
+            <p> FormulaX Beta
+            </p>
+        </div>
+        <div class="nav-right">
+            <a href="index.html">Home</a>
+            <a href="editor.html" class="active">Editor</a>
+            <a href="classroom.html">Classroom</a>
+            <a href="gallerie.html">Galerie</a>
+            <button class="logout-btn" id="logout-btn">Logout</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h1 style="margin-bottom:5px;">🛠️ Quiz-Studio & Mediathek</h1>
+        <p style="color: #64748b; margin-bottom: 25px;">Erstelle interaktive Quizzes, füge Erklärungen hinzu oder bette YouTube-Lernvideos ein.</p>
+
+        <div class="dashboard-grid">
+            <div class="editor-card-dark">
+                <h2 id="editor-mode-title">✨ Neues Projekt designen</h2>
+                
+                <label style="font-weight:bold; display:block; margin-bottom:5px; color:#94a3b8;">Titel des Quizzes</label>
+                <input type="text" id="quiz-title" class="search-input" placeholder="z.B. Satz des Pythagoras lernen">
+
+                <label style="font-weight:bold; display:block; margin-bottom:5px; color:#94a3b8;">Sichtbarkeit der Lerneinheit</label>
+                <select id="quiz-visibility" class="search-input">
+                    <option value="privat">🔒 Privat (nur für mich sichtbar)</option>
+                    <option value="oeffentlich">🌐 Öffentlich (für die ganze Schule)</option>
+                </select>
+
+                <h3 style="margin: 25px 0 15px 0; color:#fff; border-bottom:1px solid #334155; padding-bottom:5px;">📋 Fragen & Lernstufen</h3>
+                <div id="questions-container">
+                    <!-- Fragen-Karten landen hier -->
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:20px; border-top:1px solid #334155; padding-top:20px;">
+                    <button class="btn" style="background:#475569;" onclick="createNewBlankQuestion()">➕ Neue Stufe hinzufügen</button>
+                    <button class="btn" style="background:#10b981;" onclick="saveCurrentQuiz()">💾 Projekt auf Server sichern</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📚 Deine Mediathek</h2>
+                <div id="library-box" style="max-height: 650px; overflow-y: auto;">
+                    Lade Cloud-Bibliothek...
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbySow-kXXtEjavDSwOQE5I1kXbx1OoutxaaDU3IxT6Lz0AkDzthlRQvBe72z-2_A1Tt/exec";
+        let currentUser = {};
+        let currentEditingQuizId = null; 
+        let localQuestionsArray = [];
+        let libraryQuizzesGlobal = []; // Verhindert HTML-String-Fehler beim Laden von Objekten
+
+        document.addEventListener("DOMContentLoaded", () => {
+            currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+            if(!currentUser.username) { window.location.href="login.html"; return; }
+            document.getElementById("user-role-display").innerText = currentUser.role;
+
+            loadQuizLibrary();
+            resetEditor();
+        });
+
+        function resetEditor() {
+            currentEditingQuizId = null;
+            document.getElementById("editor-mode-title").innerText = "✨ Neues Projekt designen";
+            document.getElementById("quiz-title").value = "";
+            document.getElementById("quiz-visibility").value = "privat";
+            localQuestionsArray = [];
+            createNewBlankQuestion();
+        }
+
+        function createNewBlankQuestion() {
+            localQuestionsArray.push({
+                type: "classic",
+                question: "Neue Frage/Erklärung",
+                answers: ["", "", "", ""],
+                correct: "0",
+                youtubeUrl: "",
+                explanation: ""
+            });
+            renderQuestionsList(localQuestionsArray.length - 1);
+        }
+
+        function renderQuestionsList(activeEditIdx = null) {
+            const container = document.getElementById("questions-container");
+            container.innerHTML = "";
+
+            localQuestionsArray.forEach((q, idx) => {
+                let itemDiv = document.createElement("div");
+                itemDiv.className = "question-builder-item";
+                
+                if (idx === activeEditIdx) {
+                    itemDiv.classList.add("active-edit");
+                    itemDiv.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:15px; background:#1e293b; padding:8px; border-radius:6px;">
+                            <strong style="color:#3b82f6;">⚙️ Stufe ${idx + 1} konfigurieren</strong>
+                            <button class="btn-danger-sm" style="padding:2px 8px;" onclick="deleteQuestionItem(${idx})">Löschen</button>
+                        </div>
+
+                        <label style="font-size:0.85rem; color:#94a3b8;">Inhaltstyp für diese Stufe:</label>
+                        <select class="search-input" id="type-${idx}" onchange="updateQuestionType(${idx}, this.value)">
+                            <option value="classic" ${q.type === 'classic'?'selected':''}>❓ Klassische Abfrage (Multiple Choice)</option>
+                            <option value="text" ${q.type === 'text'?'selected':''}>📖 Erklärtext / Info-Seite</option>
+                            <option value="video" ${q.type === 'video'?'selected':''}>🎥 YouTube-Video + Frage</option>
+                        </select>
+
+                        <label style="font-size:0.85rem; color:#94a3b8;">Aufgabentext / Fragestellung:</label>
+                        <input type="text" class="search-input" id="qtext-${idx}" value="${q.question}" oninput="syncLocalData(${idx})">
+
+                        <div id="wrapper-yt-${idx}" style="display:${(q.type==='video')?'block':'none'};">
+                            <label style="font-size:0.85rem; color:#ef4444; font-weight:bold;">🔗 YouTube Video-URL:</label>
+                            <input type="text" class="search-input" id="yt-${idx}" placeholder="https://www.youtube.com/watch?v=..." value="${q.youtubeUrl || ''}" oninput="syncLocalData(${idx})">
+                        </div>
+
+                        <div id="wrapper-expl-${idx}" style="display:${(q.type==='text' || q.type==='video')?'block':'none'};">
+                            <label style="font-size:0.85rem; color:#94a3b8;">Erklärung / Begleittext:</label>
+                            <textarea class="search-input" id="expl-${idx}" style="height:80px; resize:vertical; font-family:inherit;" placeholder="Schreibe hier die Erklärung oder Tipps hinein..." oninput="syncLocalData(${idx})">${q.explanation || ''}</textarea>
+                        </div>
+
+                        <div id="wrapper-answers-${idx}" style="display:${(q.type==='classic' || q.type==='video')?'block':'none'};">
+                            <label style="font-size:0.85rem; color:#94a3b8;">Antwortoptionen:</label>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                <input type="text" class="search-input" id="ans0-${idx}" placeholder="A" value="${q.answers[0]||''}" oninput="syncLocalData(${idx})">
+                                <input type="text" class="search-input" id="ans1-${idx}" placeholder="B" value="${q.answers[1]||''}" oninput="syncLocalData(${idx})">
+                                <input type="text" class="search-input" id="ans2-${idx}" placeholder="C" value="${q.answers[2]||''}" oninput="syncLocalData(${idx})">
+                                <input type="text" class="search-input" id="ans3-${idx}" placeholder="D" value="${q.answers[3]||''}" oninput="syncLocalData(${idx})">
+                            </div>
+                            <label style="font-size:0.85rem; color:#10b981; font-weight:bold;">Richtige Antwort:</label>
+                            <select class="search-input" id="correct-${idx}" onchange="syncLocalData(${idx})">
+                                <option value="0" ${q.correct=='0'?'selected':''}>Antwort A</option>
+                                <option value="1" ${q.correct=='1'?'selected':''}>Antwort B</option>
+                                <option value="2" ${q.correct=='2'?'selected':''}>Antwort C</option>
+                                <option value="3" ${q.correct=='3'?'selected':''}>Antwort D</option>
+                            </select>
+                        </div>
+
+                        <button class="btn btn-sm" style="width:100%; background:#3b82f6; margin-top:10px;" onclick="renderQuestionsList(null)">✅ Änderungen temporär sichern</button>
+                    `;
+                } else {
+                    let icon = q.type==='video' ? '🎥 Video' : (q.type==='text' ? '📖 Erklärung' : '❓ MC');
+                    itemDiv.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <span style="font-size:0.8rem; background:#334155; padding:2px 6px; border-radius:4px; margin-right:5px; color:#cbd5e1;">Stufe ${idx+1} (${icon})</span>
+                                <strong style="color:#fff;">${q.question || 'Leere Frage'}</strong>
+                            </div>
+                            <button class="btn btn-sm" style="background:#475569; margin:0;" onclick="renderQuestionsList(${idx})">✏️ Bearbeiten</button>
+                        </div>
+                    `;
+                }
+                container.appendChild(itemDiv);
+            });
+        }
+
+        function updateQuestionType(idx, value) {
+            localQuestionsArray[idx].type = value;
+            document.getElementById(`wrapper-yt-${idx}`).style.display = (value === 'video') ? 'block' : 'none';
+            document.getElementById(`wrapper-expl-${idx}`).style.display = (value === 'text' || value === 'video') ? 'block' : 'none';
+            document.getElementById(`wrapper-answers-${idx}`).style.display = (value === 'classic' || value === 'video') ? 'block' : 'none';
+            syncLocalData(idx);
+        }
+
+        function syncLocalData(idx) {
+            localQuestionsArray[idx].question = document.getElementById(`qtext-${idx}`).value;
+            
+            const ytEl = document.getElementById(`yt-${idx}`);
+            if(ytEl) localQuestionsArray[idx].youtubeUrl = ytEl.value;
+
+            const explEl = document.getElementById(`expl-${idx}`);
+            if(explEl) localQuestionsArray[idx].explanation = explEl.value;
+            
+            const ans0 = document.getElementById(`ans0-${idx}`);
+            if(ans0) {
+                localQuestionsArray[idx].answers = [
+                    ans0.value,
+                    document.getElementById(`ans1-${idx}`).value,
+                    document.getElementById(`ans2-${idx}`).value,
+                    document.getElementById(`ans3-${idx}`).value
+                ];
+                localQuestionsArray[idx].correct = document.getElementById(`correct-${idx}`).value;
+            }
+        }
+
+        function deleteQuestionItem(idx) {
+            localQuestionsArray.splice(idx, 1);
+            if(localQuestionsArray.length === 0) createNewBlankQuestion();
+            else renderQuestionsList(null);
+        }
+
+        async function loadQuizLibrary() {
+            const box = document.getElementById("library-box");
+            box.innerHTML = "Lade Cloud-Bibliothek...";
+            try {
+                const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "loadQuizzes", username: currentUser.username }) });
+                const data = await res.json();
+                if(data.success) {
+                    box.innerHTML = "";
+                    libraryQuizzesGlobal = data.quizzes; // Wechselspeicher setzen
+                    
+                    data.quizzes.forEach((q, idx) => {
+                        let li = document.createElement("div"); li.className = "project-item";
+                        li.style.flexDirection = "column"; li.style.alignItems = "stretch"; li.style.gap = "10px";
+                        let badge = q.visibility === "oeffentlich" ? `<span class="badge-public">Öffentlich</span>` : `<span class="badge-private">Privat</span>`;
+                        let hasRights = (q.creator === currentUser.username || currentUser.role === "admin");
+
+                        let actionButtons = hasRights ? `
+                            <div style="display:flex; gap:5px; margin-top:5px;">
+                                <button class="btn btn-sm" style="padding:5px 10px; font-size:0.8rem;" onclick="loadQuizFromLibraryIndex(${idx})">✏️ Laden</button>
+                                <button class="btn-danger-sm" style="padding:5px 10px; font-size:0.8rem;" onclick='deleteQuizFromServer("${q.id}")'>Löschen</button>
+                            </div>` : `<span style="font-size:0.8rem; color:#94a3b8; font-style:italic;">🔒 Schreibgeschützt (${q.creator})</span>`;
+
+                        li.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong>${q.title}</strong>${badge}</div>${actionButtons}`;
+                        box.appendChild(li);
+                    });
+                }
+            } catch(e) { box.innerHTML = "Fehler beim Laden."; }
+        }
+
+        function loadQuizFromLibraryIndex(idx) {
+            const quiz = libraryQuizzesGlobal[idx];
+            if(!quiz) return;
+            currentEditingQuizId = quiz.id;
+            document.getElementById("editor-mode-title").innerText = "📝 Projekt bearbeiten (" + quiz.id + ")";
+            document.getElementById("quiz-title").value = quiz.title;
+            document.getElementById("quiz-visibility").value = quiz.visibility;
+            localQuestionsArray = JSON.parse(JSON.stringify(quiz.questions)); // Deep-Copy
+            renderQuestionsList(null);
+        }
+
+        async function saveCurrentQuiz() {
+            const title = document.getElementById("quiz-title").value;
+            const visibility = document.getElementById("quiz-visibility").value;
+            if(!title) return alert("Bitte einen Titel eingeben!");
+
+            // Letzten Stand mitsynchronisieren, falls noch eine Karte offen ist
+            const activeEdit = document.querySelector(".active-edit");
+            if(activeEdit) {
+                const btn = activeEdit.querySelector("button[onclick*='renderQuestionsList(null)']");
+                if(btn) btn.click();
+            }
+
+            const payload = {
+                action: "saveQuiz",
+                quizId: currentEditingQuizId,
+                title: title,
+                creator: currentUser.username,
+                visibility: visibility,
+                questions: localQuestionsArray
+            };
+
+            const res = await fetch(API_URL, { method:"POST", body: JSON.stringify(payload) });
+            const result = await res.json();
+            if(result.quizId) {
+                alert("Erfolgreich in der Cloud gesichert!");
+                resetEditor(); loadQuizLibrary();
+            } else { alert("Fehler: " + result.message); }
+        }
+
+        async function deleteQuizFromServer(qId) {
+            if(!confirm("Dieses Quiz wirklich unwiderruflich löschen?")) return;
+            const res = await fetch(API_URL, { method:"POST", body: JSON.stringify({ action:"deleteQuiz", quizId: qId, username: currentUser.username }) });
+            const result = await res.json();
+            if(result.success) { alert("Gelöscht."); resetEditor(); loadQuizLibrary(); }
+        }
+
+        document.getElementById("logout-btn").addEventListener("click", () => { sessionStorage.clear(); window.location.href="login.html"; });
+    </script>
+</body>
+</html>

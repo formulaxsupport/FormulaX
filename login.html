@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormulaX - Login</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --container-bg: #162447;
+            --text-color: #ffffff;
+            --text-muted: #b5b5b5;
+            --primary-color: #e43f5a;
+            --primary-hover: #b93249;
+            --input-bg: #1f4068;
+            --accent-color: #00fff0;
+        }
+
+        [data-theme="light"] {
+            --bg-color: #f4f6f9;
+            --container-bg: #ffffff;
+            --text-color: #1a1a2e;
+            --text-muted: #6c757d;
+            --primary-color: #e43f5a;
+            --primary-hover: #b93249;
+            --input-bg: #eaedf2;
+            --accent-color: #007bff;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; transition: background 0.3s, color 0.3s; }
+        body { background: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; height: 100vh; position: relative; }
+        
+        .theme-toggle { 
+            position: fixed; 
+            bottom: 20px; 
+            right: 20px; 
+            width: 75px;
+            height: 35px;
+            padding: 0;
+            background: var(--container-bg); 
+            color: var(--text-color); 
+            border: 1px solid var(--text-muted); 
+            border-radius: 20px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 11px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .theme-toggle:hover { opacity: 0.9; border-color: var(--accent-color); }
+
+        .auth-container { background: var(--container-bg); padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 100%; max-width: 400px; text-align: center; }
+        h2 { margin-bottom: 20px; color: var(--primary-color); font-size: 32px; letter-spacing: 1px; }
+        input, select { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 5px; background: var(--input-bg); color: var(--text-color); font-size: 16px; }
+        input::placeholder { color: var(--text-muted); }
+        
+        button { width: 100%; padding: 12px; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; transition: 0.2s; }
+        .btn-primary { background: var(--primary-color); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: var(--input-bg); color: var(--accent-color); border: 1px solid var(--accent-color); }
+        .btn-secondary:hover { background: var(--accent-color); color: var(--container-bg); }
+        
+        p { margin-top: 15px; font-size: 14px; color: var(--text-muted); }
+        a { color: var(--accent-color); text-decoration: none; font-weight: bold; }
+        a:hover { text-decoration: underline; }
+        .hidden { display: none !important; }
+        .message { padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 14px; font-weight: bold; }
+        .message.success { background: #1f6f4e; color: #fff; }
+        .message.error { background: #a32a2a; color: #fff; }
+    </style>
+</head>
+<body>
+
+    <button id="theme-btn" class="theme-toggle">🌓 Modus</button>
+
+    <div class="auth-container">
+        <h2>FormulaX</h2>
+        <div id="message-box" class="message hidden"></div>
+
+        <div id="login-box">
+            <form id="login-form">
+                <input type="text" id="login-username" placeholder="Benutzername" required autocomplete="username">
+                <input type="password" id="login-password" placeholder="Passwort" required autocomplete="current-password">
+                <button type="submit" class="btn-primary">Einloggen</button>
+            </form>
+            <p>Noch kein Konto? <a href="#" id="to-register">Hier registrieren</a></p>
+            <button id="guest-btn" class="btn-secondary">Als Gast beitreten</button>
+        </div>
+
+        <div id="register-box" class="hidden">
+            <form id="register-form">
+                <input type="text" id="register-username" placeholder="Wunsch-Benutzername" required autocomplete="username">
+                <input type="password" id="register-password" placeholder="Passwort erstellen" required autocomplete="new-password">
+                
+                <select id="register-role">
+                    <option value="schueler">Ich bin Schüler</option>
+                    <option value="lehrer">Ich bin Lehrer</option>
+                </select>
+
+                <div id="lehrer-pin-container" class="hidden">
+                    <input type="password" id="lehrer-pin" placeholder="Lehrer-Verifizierungs-PIN">
+                </div>
+
+                <button type="submit" class="btn-primary">Konto erstellen</button>
+            </form>
+            <p>Bereits registriert? <a href="#" id="to-login">Hier anmelden</a></p>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script>
+        const themeBtn = document.getElementById('theme-btn');
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', currentTheme);
+
+        themeBtn.addEventListener('click', () => {
+            let theme = document.documentElement.getAttribute('data-theme');
+            let newTheme = theme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+    </script>
+</body>
+</html>
