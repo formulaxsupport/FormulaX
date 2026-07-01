@@ -4,62 +4,249 @@
     <meta charset="UTF-8">
     <title>FormulaX - Galerie</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
+        .quiz-card-item { background: #fff; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.02); position: relative; }
+        .quiz-card-item:hover { transform: translateY(-3px); border-color: #3b82f6; }
+        
+        .player-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.8); z-index:9999; justify-content: center; align-items: center; }
+        .player-content { width: 90%; max-width:550px; height: 500px; background:#1e293b; padding:30px; border-radius:12px; border:1px solid #334155; color: white; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); position: relative; display: flex; flex-direction: column; overflow: hidden; }
+        
+        .play-scroll-area { flex: 1; overflow-y: auto; padding-right: 5px; }
+
+        .feedback-fullscreen-layer { display:none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10000; padding: 40px 30px; flex-direction: column; justify-content: center; align-items: center; text-align: center; box-sizing: border-box; animation: fadeIn 0.2s ease-in-out; }
+        .feedback-correct-bg { background: #064e3b; color: #a7f3d0; }
+        .feedback-wrong-bg { background: #7f1d1d; color: #fca5a5; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .mc-btn { width:100%; text-align:left; background:#334155; border:1px solid #475569; color:#fff; padding:12px; margin-bottom:10px; border-radius:6px; cursor:pointer; font-size:1rem; }
+        .mc-btn:hover { background:#475569; }
+    </style>
 </head>
 <body>
     <nav class="navbar">
-        <div class="nav-left">
-            <img src="bilder/logo.jpg" alt="FormulaX Logo" class="logo-img">
-            <span class="role-badge" id="user-role-display">...</span>
-        </div>
-        <div>
-            <p> FormulaX Beta
-            </p>
-        </div>
-        <div class="nav-right">
-            <a href="index.html">Home</a>
-            <a href="editor.html">Editor</a>
-            <a href="classroom.html">Classroom</a>
-            <a href="gallerie.html" class="active">Galerie</a>
-            <button class="logout-btn" id="logout-btn">Logout</button>
-        </div>
+        <div class="nav-left"><img src="bilder/logo.jpg" alt="Logo" class="logo-img"><span class="role-badge" id="user-role-display">...</span></div>
+        <div class="nav-right"><a href="index.html">Home</a><a href="editor.html">Editor</a><a href="classroom.html">Classroom</a><a href="gallerie.html" class="active">Galerie</a><button class="logout-btn" id="logout-btn">Logout</button></div>
     </nav>
 
     <main class="container">
-        <h1>🌐 Öffentliche Projektgalerie</h1>
-        <input type="text" id="gallery-search" class="search-input" placeholder="🔍 Nach Themen oder Erstellern suchen..." oninput="searchGallery()">
+        <h1>🌌 Quiz- & Aufgaben-Galerie</h1>
+        <p style="color: #64748b;">Wähle ein öffentliches Lernpaket aus und teste dein Wissen direkt online.</p>
 
-        <div class="grid-3" id="gallery-grid">Lade Galerie...</div>
+        <div class="gallery-grid" id="gallery-container">Lade Challenges...</div>
     </main>
+
+    <!-- ZENTRIERTER PLAYER -->
+    <div id="quiz-player" class="player-overlay">
+        <div class="player-content">
+            
+            <div id="fullscreen-feedback" class="feedback-fullscreen-layer">
+                <h1 id="feedback-title" style="font-size: 2.2rem; margin-top: 0; margin-bottom: 10px;">🎉 Richtig!</h1>
+                <p id="feedback-xp-text" style="font-size: 1.15rem; font-weight: bold; margin-bottom: 20px;"></p>
+                
+                <div id="feedback-explanation-box" style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; max-width: 100%; width: 100%; overflow-y: auto; max-height: 180px; margin-bottom: 25px; text-align: left; font-size: 0.95rem; line-height: 1.4;">
+                    <strong>Erklärung:</strong> <span id="feedback-explanation-text">...</span>
+                </div>
+
+                <button class="btn" style="background:#fff; color:#0f172a; font-weight:bold; min-width:150px;" onclick="triggerNextStepNow()">Weiter &rarr;</button>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid #334155; padding-bottom:10px; flex-shrink: 0;">
+                <h2 id="play-quiz-title" style="margin:0; color:#fff;">Quiz</h2>
+                <button class="btn btn-sm" style="background:#ef4444;" onclick="closePlayer()">Beenden</button>
+            </div>
+            
+            <div class="play-scroll-area" id="play-zone">
+                <p id="play-question-step" style="color:#3b82f6; font-weight:bold; font-size:0.85rem; margin-top: 0;"></p>
+                <h3 id="play-question-text" style="color:#fff; margin-bottom:20px; white-space: pre-wrap; line-height:1.5;">Frage...</h3>
+                
+                <img id="play-question-img" style="max-width:100%; max-height:180px; border-radius:8px; margin-bottom:20px; display:none; object-fit:contain; background:#0f172a; padding:5px; margin-left:auto; margin-right:auto;">
+                <div id="play-video-container" style="display:none; margin-bottom:20px;"></div>
+                <div id="play-answers-area"></div>
+            </div>
+        </div>
+    </div>
 
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbySow-kXXtEjavDSwOQE5I1kXbx1OoutxaaDU3IxT6Lz0AkDzthlRQvBe72z-2_A1Tt/exec";
+        let currentUser = {};
+        let activeQuizList = [];
+        let currentQuiz = null;
+        let currentQuestionIndex = 0;
+        let gainedXpTotal = 0;
+        let waitingForNext = false;
 
-        document.addEventListener("DOMContentLoaded", async () => {
-            const user = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
-            if(!user.username) { window.location.href="login.html"; return; }
-            document.getElementById("user-role-display").innerText = user.role;
-            
-            const res = await fetch(API_URL, { method:"POST", body: JSON.stringify({ action:"loadQuizzes", username: user.username }) });
-            const data = await res.json();
-            if(data.success) {
-                const grid = document.getElementById("gallery-grid");
-                grid.innerHTML = "";
-                data.quizzes.forEach(q => {
-                    if(q.visibility === "oeffentlich") {
-                        grid.innerHTML += `<div class="card gallery-item"><h3>${q.title}</h3><p style="font-size:0.9rem; color:#64748b; margin:10px 0;">Erstellt von: ${q.creator}</p><button class="btn" style="width:100%" onclick='alert("Starte das Quiz über deine Startseite!")'>Verfügbar auf Home</button></div>`;
-                    }
-                });
-            }
+        document.addEventListener("DOMContentLoaded", () => {
+            currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
+            if(!currentUser.username) { window.location.href="login.html"; return; }
+            document.getElementById("user-role-display").innerText = currentUser.role;
+            loadGallery();
         });
 
-        function searchGallery() {
-            const query = document.getElementById("gallery-search").value.toLowerCase();
-            const items = document.querySelectorAll(".gallery-item");
-            items.forEach(item => {
-                if(item.innerText.toLowerCase().includes(query)) item.style.display = "block";
-                else item.style.display = "none";
-            });
+        async function loadGallery() {
+            const container = document.getElementById("gallery-container");
+            const res = await fetch(API_URL, { method:"POST", body: JSON.stringify({ action:"loadQuizzes", username: currentUser.username }) });
+            const data = await res.json();
+            
+            if(data.success) {
+                activeQuizList = data.quizzes.filter(q => q.visibility === "oeffentlich" || q.creator === currentUser.username);
+                container.innerHTML = "";
+
+                activeQuizList.forEach((q, idx) => {
+                    let qArray = typeof q.questions === 'string' ? JSON.parse(q.questions) : q.questions;
+                    let card = document.createElement("div");
+                    card.className = "quiz-card-item";
+                    
+                    let deleteBtnHtml = "";
+                    if(q.creator === currentUser.username || currentUser.role === "admin") {
+                        deleteBtnHtml = `<button onclick="deleteQuizItem(event, '${q.id}')" style="position:absolute; top:10px; right:10px; background:#ef4444; color:white; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:0.75rem; z-index:10;">Löschen</button>`;
+                    }
+
+                    card.innerHTML = `
+                        ${deleteBtnHtml}
+                        <div onclick="startQuizSession(${idx})">
+                            <strong style="font-size:1.1rem; color:#0f172a; display:block; padding-right:50px;">📝 ${q.title}</strong>
+                            <span style="font-size:0.8rem; color:#64748b;">Von: ${q.creator}</span>
+                            <div style="margin-top:10px; font-size:0.85rem; color:#3b82f6; font-weight:600;">${qArray.length} Elemente &rarr; Starten</div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            }
         }
+
+        async function deleteQuizItem(event, quizId) {
+            event.stopPropagation();
+            if(confirm("Möchtest du dieses Quiz wirklich dauerhaft löschen?")) {
+                const res = await fetch(API_URL, { method:"POST", body: JSON.stringify({ action:"deleteQuiz", quizId: quizId, username: currentUser.username }) });
+                const d = await res.json();
+                if(d.success) loadGallery();
+                else alert(d.message);
+            }
+        }
+
+        function startQuizSession(index) {
+            currentQuiz = activeQuizList[index];
+            if(typeof currentQuiz.questions === 'string') currentQuiz.questions = JSON.parse(currentQuiz.questions);
+            currentQuestionIndex = 0;
+            gainedXpTotal = 0;
+            waitingForNext = false;
+            document.getElementById("quiz-player").style.display = "flex";
+            document.getElementById("play-quiz-title").innerText = currentQuiz.title;
+            showQuestion();
+        }
+
+        function showQuestion() {
+            document.getElementById("fullscreen-feedback").style.display = "none";
+            waitingForNext = false;
+
+            const q = currentQuiz.questions[currentQuestionIndex];
+            
+            // Label-Zuweisung je nach Inhalt
+            let typeLabel = q.type === 'info' ? "Information" : "Aufgabe";
+            document.getElementById("play-question-step").innerText = `${typeLabel} ${currentQuestionIndex + 1} von ${currentQuiz.questions.length}`;
+            document.getElementById("play-question-text").innerText = q.questionText;
+            
+            const img = document.getElementById("play-question-img");
+            if(q.imageBase64) { img.src = q.imageBase64; img.style.display = "block"; } 
+            else { img.style.display = "none"; }
+
+            const videoBox = document.getElementById("play-video-container");
+            videoBox.innerHTML = "";
+            if(q.type === 'video' && q.videoUrl) {
+                let embedUrl = q.videoUrl.replace("watch?v=", "embed/");
+                videoBox.innerHTML = `<iframe width="100%" height="200" src="${embedUrl}" frameborder="0" allowfullscreen></iframe>`;
+                videoBox.style.display = "block";
+            } else { videoBox.style.display = "none"; }
+
+            const area = document.getElementById("play-answers-area");
+            area.innerHTML = "";
+
+            // Render-Logik nach Typ splitten
+            if(q.type === 'info') {
+                // NEU: Reiner "Weiter"-Button für Infokarten ohne Umweg über Feedback-Screen
+                let nextBtn = document.createElement("button");
+                nextBtn.className = "btn";
+                nextBtn.style.width = "100%";
+                nextBtn.style.background = "#3b82f6";
+                nextBtn.innerText = "Gelesen & Weiter ➔";
+                nextBtn.onclick = () => triggerNextStepNow();
+                area.appendChild(nextBtn);
+            } else if(q.type === 'multiple') {
+                q.options.forEach((opt, oIdx) => {
+                    if(!opt) return;
+                    let btn = document.createElement("button");
+                    btn.className = "mc-btn";
+                    btn.innerText = opt;
+                    btn.onclick = () => { if(!waitingForNext) checkAnswer(oIdx === Number(q.correctAnswerIndex)); };
+                    area.appendChild(btn);
+                });
+            } else {
+                area.innerHTML = `
+                    <input type="text" id="free-answer-input" class="search-input" style="background:#0f172a; color:#fff; margin-bottom:12px;" placeholder="Lösung eintippen...">
+                    <button class="btn" style="width:100%; background:#10b981;" onclick="checkFreeAnswer()">Prüfen</button>
+                `;
+            }
+        }
+
+        function checkFreeAnswer() {
+            if(waitingForNext) return;
+            const studentInput = document.getElementById("free-answer-input").value.trim().toLowerCase();
+            const correctAns = currentQuiz.questions[currentQuestionIndex].correctTextAnswer ? currentQuiz.questions[currentQuestionIndex].correctTextAnswer.trim().toLowerCase() : "";
+            checkAnswer(studentInput === correctAns);
+        }
+
+        function checkAnswer(isCorrect) {
+            waitingForNext = true;
+            const q = currentQuiz.questions[currentQuestionIndex];
+            
+            const layer = document.getElementById("fullscreen-feedback");
+            const titleEl = document.getElementById("feedback-title");
+            const xpEl = document.getElementById("feedback-xp-text");
+            const expTextEl = document.getElementById("feedback-explanation-text");
+            const expBoxEl = document.getElementById("feedback-explanation-box");
+
+            layer.className = "feedback-fullscreen-layer " + (isCorrect ? "feedback-correct-bg" : "feedback-wrong-bg");
+            titleEl.innerText = isCorrect ? "🎉 Richtig gelöst!" : "❌ Leider falsch...";
+            xpEl.innerText = isCorrect ? "+10 XP wurden gutgeschrieben!" : "Keine Punkte für diese Aufgabe.";
+            
+            if(q.explanation && q.explanation.trim() !== "") {
+                expTextEl.innerText = q.explanation;
+                expBoxEl.style.display = "block";
+            } else {
+                expBoxEl.style.display = "none";
+            }
+
+            if(isCorrect) gainedXpTotal += 10;
+            layer.style.display = "flex";
+        }
+
+        function triggerNextStepNow() {
+            if(currentQuestionIndex + 1 < currentQuiz.questions.length) {
+                currentQuestionIndex++;
+                showQuestion();
+            } else {
+                const layer = document.getElementById("fullscreen-feedback");
+                layer.className = "feedback-fullscreen-layer feedback-correct-bg";
+                document.getElementById("feedback-title").innerText = "🏁 Quiz absolviert!";
+                document.getElementById("feedback-xp-text").innerText = `Ausgezeichnet! Du hast insgesamt ${gainedXpTotal} XP gesammelt.`;
+                document.getElementById("feedback-explanation-box").style.display = "none";
+                
+                const btn = layer.querySelector("button");
+                btn.innerText = "Zur Galerie";
+                btn.onclick = async () => {
+                    if(gainedXpTotal > 0) {
+                        await fetch(API_URL, { method:"POST", body: JSON.stringify({ action: "addXp", username: currentUser.username, xp: gainedXpTotal }) });
+                    }
+                    closePlayer();
+                };
+                layer.style.display = "flex"; // Zeigt Abschluss-Screen an, falls über eine Info-Karte beendet wurde
+            }
+        }
+
+        function closePlayer() { document.getElementById("quiz-player").style.display = "none"; loadGallery(); }
+        document.getElementById("logout-btn").addEventListener("click", () => { sessionStorage.clear(); window.location.href="login.html"; });
     </script>
 </body>
 </html>
