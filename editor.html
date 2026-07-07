@@ -1,19 +1,42 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
+    <link rel="icon" type="image/jpeg" href="bilder/weblogo.jpg">
     <meta charset="UTF-8">
-    <title>FormulaX - Aufgaben-Studio</title>
+    <title>FormulaX - Editor</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        .question-card { background: #fff; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; margin-bottom: 20px; position: relative; }
+        :root { --bg-dark: #0f172a; --bg-card: #1e293b; --border-color: #334155; --text-light: #f8fafc; --primary: #3b82f6; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; margin: 0; padding-top: 80px; }
+        
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto 40px auto !important; 
+            padding-top: 110px !important; 
+            padding-left: 20px;
+            padding-right: 20px;
+            display: block !important;
+        }
+        
+        .card { background: white; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .question-card { background: #fff; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; margin-bottom: 20px; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .search-input { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 1rem; margin-top: 5px; margin-bottom: 5px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; color: white; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+        .btn-sm { padding: 5px 10px; font-size: 0.85rem; }
+        .logout-btn { background: #ef4444; border: none; padding: 6px 12px; border-radius: 4px; color: white; cursor: pointer; margin-left: 15px; }
         .image-preview { max-width: 180px; max-height: 130px; margin-top: 10px; border-radius: 6px; display: block; border: 1px dashed #cbd5e1; background: #f8fafc; object-fit: contain; }
         .mc-option-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .mc-option-row input[type="radio"] { width: 20px; height: 20px; cursor: pointer; accent-color: #10b981; }
+        .mc-option-row input[type="radio"] { width: 20px; height: 20px; cursor: pointer; accent-color: #10b981; margin: 0; }
+        .sort-btn-group { position: absolute; top: 15px; right: 100px; display: flex; gap: 5px; }
+        
+        /* Styles für Unteraufgaben */
+        .sub-question-box { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #0284c7; padding: 15px; border-radius: 6px; margin-top: 15px; position: relative; }
     </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-left"><img src="bilder/logo.jpg" alt="Logo" class="logo-img"><span class="role-badge" id="user-role-display">...</span></div>
+        <p> FormulaX Beta V1 </p>
         <div class="nav-right"><a href="index.html">Home</a><a href="editor.html" class="active">Editor</a><a href="classroom.html">Classroom</a><a href="gallerie.html">Galerie</a><button class="logout-btn" id="logout-btn">Logout</button></div>
     </nav>
 
@@ -45,7 +68,7 @@
             <button class="btn" style="background:#0284c7;" onclick="addQuestionData('freetext')">✏️ Texteingabe</button>
             <button class="btn" style="background:#14b8a6;" onclick="addQuestionData('video')">🎬 Video-Analyse</button>
             <button class="btn" style="background:#6366f1;" onclick="addQuestionData('info')">ℹ️ Infokarte / Text</button>
-            <button class="btn" style="background:#10b981; margin-left: auto;" onclick="saveCompleteQuizToServer()">💾 Quiz speichern (Cloud)</button>
+            <button class="btn" id="save-quiz-btn" style="background:#10b981; margin-left: auto;" onclick="saveCompleteQuizToServer()">💾 Quiz保存 (Cloud)</button>
         </div>
     </main>
 
@@ -58,57 +81,78 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "{}");
-            if(!currentUser.username || currentUser.role === "schueler") { window.location.href = "index.html"; return; }
+            if (!currentUser.username || currentUser.role === "schueler") {
+                alert("🔒 Beta-Zugriff verweigert:\nAls Schüler hast du in dieser Beta-Version keinen Zugriff auf das Aufgaben-Studio.");
+                window.location.href = "index.html";
+                return;
+            }
             document.getElementById("user-role-display").innerText = currentUser.role;
 
             fetchQuizListForSelector();
-            resetToNewQuiz();
+            resetToNewQuiz(false);
         });
 
         async function fetchQuizListForSelector() {
-            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "loadQuizzes", username: currentUser.username }) });
-            const data = await res.json();
-            if(data.success) {
-                allQuizzesFetched = data.quizzes;
-                const selector = document.getElementById("quiz-selector");
-                while(selector.options.length > 1) { selector.remove(1); }
-                
-                data.quizzes.forEach(q => {
-                    if(q.creator === currentUser.username) {
-                        let opt = document.createElement("option");
-                        opt.value = q.id;
-                        opt.innerText = `📝 ${q.title} [${q.visibility}]`;
-                        selector.appendChild(opt);
-                    }
-                });
-            }
+            try {
+                const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "loadQuizzes", username: currentUser.username }) });
+                const data = await res.json();
+                if(data.success) {
+                    allQuizzesFetched = data.quizzes;
+                    const selector = document.getElementById("quiz-selector");
+                    while(selector.options.length > 1) { selector.remove(1); }
+                    
+                    data.quizzes.forEach(q => {
+                        if(q.creator === currentUser.username || currentUser.role === "admin") {
+                            let opt = document.createElement("option");
+                            opt.value = q.id;
+                            opt.innerText = `📝 ${q.title} [${q.visibility}]`;
+                            selector.appendChild(opt);
+                        }
+                    });
+                }
+            } catch (e) { console.error("Fehler beim Laden der Quizliste:", e); }
         }
 
         function onQuizSelectionChange(val) {
             if(val === "NEW") {
-                resetToNewQuiz();
+                resetToNewQuiz(true);
             } else {
                 const target = allQuizzesFetched.find(q => q.id === val);
                 if(target) {
                     currentEditingQuizId = target.id;
                     document.getElementById("quiz-title").value = target.title;
                     document.getElementById("quiz-visibility").value = target.visibility;
-                    questionsArray = typeof target.questions === 'string' ? JSON.parse(target.questions) : target.questions;
+                    
+                    let parsedQuestions = typeof target.questions === 'string' ? JSON.parse(target.questions) : target.questions;
+                    
+                    questionsArray = parsedQuestions.map(q => {
+                        if(q.type === 'multiple') {
+                            let opts = Array.isArray(q.options) ? q.options : [];
+                            while(opts.length < 4) opts.push("");
+                            return { ...q, options: opts, subQuestions: q.subQuestions || [] };
+                        }
+                        return { ...q, subQuestions: q.subQuestions || [] };
+                    });
+
                     renderQuestions();
                 }
             }
         }
 
-        function resetToNewQuiz() {
+        function resetToNewQuiz(askConfirmation = true) {
+            if(askConfirmation && !confirm("Möchtest du das aktuelle Quiz wirklich verwerfen und ein neues erstellen?")) {
+                document.getElementById("quiz-selector").value = currentEditingQuizId || "NEW";
+                return;
+            }
             currentEditingQuizId = null;
             document.getElementById("quiz-title").value = "";
             document.getElementById("quiz-visibility").value = "oeffentlich";
-            questionsArray = [];
-            addQuestionData('multiple');
+            questionsArray = []; 
+            addQuestionData('multiple'); 
         }
 
         function addQuestionData(type) {
-            const id = "Q-NUM-" + Date.now() + Math.floor(Math.random()*100);
+            const id = "Q-" + Date.now() + "-" + Math.floor(Math.random()*1000);
             questionsArray.push({ 
                 id: id, 
                 type: type, 
@@ -118,7 +162,8 @@
                 correctAnswerIndex: 0, 
                 correctTextAnswer: "", 
                 videoUrl: "",
-                explanation: "" 
+                explanation: "",
+                subQuestions: []
             });
             renderQuestions();
         }
@@ -126,6 +171,15 @@
         function removeQuestion(index) {
             if(questionsArray.length <= 1) return alert("Mindestens eine Aufgabe erforderlich!");
             questionsArray.splice(index, 1);
+            renderQuestions();
+        }
+
+        function moveQuestion(index, direction) {
+            const newIndex = index + direction;
+            if(newIndex < 0 || newIndex >= questionsArray.length) return;
+            const temp = questionsArray[index];
+            questionsArray[index] = questionsArray[newIndex];
+            questionsArray[newIndex] = temp;
             renderQuestions();
         }
 
@@ -141,7 +195,36 @@
             reader.readAsDataURL(file);
         }
 
-        function setCorrectRadio(qIndex, optIndex) { questionsArray[qIndex].correctAnswerIndex = optIndex; }
+        function setCorrectRadio(qIndex, optIndex) { 
+            questionsArray[qIndex].correctAnswerIndex = optIndex; 
+        }
+
+        // UNTERAUFGABEN LOGIK
+        function addSubQuestion(qIndex) {
+            if(!questionsArray[qIndex].subQuestions) {
+                questionsArray[qIndex].subQuestions = [];
+            }
+            const letters = ['a', 'b', 'c', 'd', 'e', 'f'];
+            const nextLetter = letters[questionsArray[qIndex].subQuestions.length] || "?";
+            
+            questionsArray[qIndex].subQuestions.push({
+                letter: nextLetter,
+                questionText: "",
+                correctTextAnswer: "",
+                explanation: ""
+            });
+            renderQuestions();
+        }
+
+        function removeSubQuestion(qIndex, subIndex) {
+            questionsArray[qIndex].subQuestions.splice(subIndex, 1);
+            // Buchstaben neu indizieren
+            const letters = ['a', 'b', 'c', 'd', 'e', 'f'];
+            questionsArray[qIndex].subQuestions.forEach((sub, idx) => {
+                sub.letter = letters[idx] || "?";
+            });
+            renderQuestions();
+        }
 
         function renderQuestions() {
             const container = document.getElementById("questions-list-container");
@@ -149,13 +232,24 @@
             questionsArray.forEach((q, index) => {
                 let card = document.createElement("div");
                 card.className = "question-card";
+                
                 let deleteBtn = `<button style="position:absolute; top:15px; right:15px; background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="removeQuestion(${index})">Löschen</button>`;
                 
-                let displayType = q.type === 'info' ? 'ℹ️ Infokarte / Erklärungstext' : q.type;
-                let placeholderText = q.type === 'info' ? 'Erklärungstext oder mathematische Theorie hier eintragen...' : 'Fragestellung eintippen...';
+                let upDisabled = index === 0 ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : '';
+                let downDisabled = index === questionsArray.length - 1 ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : '';
+                
+                let sortButtons = `
+                    <div class="sort-btn-group">
+                        <button class="btn btn-sm" style="background:#475569;" onclick="moveQuestion(${index}, -1)" ${upDisabled}>🔼</button>
+                        <button class="btn btn-sm" style="background:#475569;" onclick="moveQuestion(${index}, 1)" ${downDisabled}>🔽</button>
+                    </div>
+                `;
+                
+                let displayType = q.type === 'info' ? 'ℹ️ Infokarte / Erklärungstext' : (q.type === 'multiple' ? '➕ Multiple Choice' : (q.type === 'freetext' ? '✏️ Texteingabe' : '🎬 Video-Analyse'));
+                let placeholderText = q.type === 'info' ? 'Erklärungstext oder mathematische Theorie hier eintragen...' : 'Haupt-Fragestellung eintippen...';
 
-                let commonHeader = `<div style="margin-bottom:12px;"><strong>Aufgabe #${index + 1} &mdash; ${displayType}</strong></div>
-                    <textarea class="search-input" style="height: 60px; font-family:inherit; padding:10px;" placeholder="${placeholderText}" id="input-text-${index}">${q.questionText || ''}</textarea>`;
+                let commonHeader = `<div style="margin-bottom:12px; padding-right:180px;"><strong>Aufgabe #${index + 1} &mdash; ${displayType}</strong></div>
+                    <textarea class="search-input" style="height: 70px; font-family:inherit; padding:10px;" placeholder="${placeholderText}" id="input-text-${index}">${q.questionText || ''}</textarea>`;
 
                 let imageUploadSegment = q.type !== 'video' ? `<div style="margin: 15px 0; padding: 10px; background: #f8fafc; border-radius: 6px;"><input type="file" accept="image/*" onchange="handleImageUpload(event, ${index})"><img id="preview-${index}" class="image-preview" src="${q.imageBase64 || ''}" style="${q.imageBase64 ? 'display:block;' : 'display:none;'}"></div>` : "";
                 let specificBody = "";
@@ -165,51 +259,119 @@
                     for(let o = 0; o < 4; o++) {
                         specificBody += `<div class="mc-option-row">
                             <input type="radio" name="correct-ans-${index}" ${Number(q.correctAnswerIndex) === o ? 'checked' : ''} onclick="setCorrectRadio(${index}, ${o})">
-                            <input type="text" class="search-input" style="margin:0;" value="${q.options[o] || ''}" oninput="questionsArray[${index}].options[${o}]=this.value" placeholder="Option ${String.fromCharCode(65+o)}">
+                            <input type="text" class="search-input" style="margin:0;" value="${q.options[o] || ''}" id="opt-${index}-${o}" placeholder="Option ${String.fromCharCode(65+o)}">
                         </div>`;
                     }
                     specificBody += `</div>`;
                 } else if (q.type === 'freetext') {
-                    specificBody = `<div style="margin-top:10px;"><input type="text" class="search-input" value="${q.correctTextAnswer || ''}" oninput="questionsArray[${index}].correctTextAnswer=this.value" placeholder="Lösungstext..."></div>`;
+                    specificBody = `<div style="margin-top:10px; border: 1px dashed #cbd5e1; padding: 15px; border-radius: 8px; background: #fafafa;">
+                        <strong style="font-size:0.9rem; color:#475569;">Standard-Antwort (wenn keine Unteraufgaben existieren):</strong>
+                        <input type="text" class="search-input" id="free-${index}" value="${q.correctTextAnswer || ''}" placeholder="Lösungstext...">
+                        
+                        <div id="sub-questions-area-${index}" style="margin-top:15px;">`;
+                        
+                        if(q.subQuestions && q.subQuestions.length > 0) {
+                            q.subQuestions.forEach((sub, subIdx) => {
+                                specificBody += `
+                                <div class="sub-question-box">
+                                    <button style="position:absolute; top:10px; right:10px; background:none; border:none; color:#ef4444; font-weight:bold; cursor:pointer;" onclick="removeSubQuestion(${index}, ${subIdx})">❌ Entfernen</button>
+                                    <strong style="color:#0284c7;">Teilaufgabe ${sub.letter})</strong>
+                                    <input type="text" class="search-input" id="sub-text-${index}-${subIdx}" value="${sub.questionText || ''}" placeholder="Aufgabentext für Teilaufgabe ${sub.letter}...">
+                                    <input type="text" class="search-input" style="background:#fff;" id="sub-auth-${index}-${subIdx}" value="${sub.correctTextAnswer || ''}" placeholder="Exakte Lösung...">
+                                    <input type="text" class="search-input" style="background:#fcfffa; border-color:#bbf7d0;" id="sub-explain-${index}-${subIdx}" value="${sub.explanation || ''}" placeholder="Eigene Erklärung für Teilaufgabe ${sub.letter} (optional)...">
+                                </div>`;
+                            });
+                        }
+                        
+                    specificBody += `</div>
+                        <button class="btn btn-sm" style="background:#0284c7; margin-top:15px;" onclick="addSubQuestion(${index})">➕ Teilaufgabe hinzufügen (a, b, c...)</button>
+                    </div>`;
                 } else if (q.type === 'video') {
-                    specificBody = `<div style="margin-top:10px;"><input type="text" class="search-input" value="${q.videoUrl || ''}" oninput="questionsArray[${index}].videoUrl=this.value" placeholder="YouTube URL..."></div>`;
+                    specificBody = `<div style="margin-top:10px;"><input type="text" class="search-input" id="vid-${index}" value="${q.videoUrl || ''}" placeholder="YouTube URL (z.B. https://www.youtube.com/watch?v=...)"></div>`;
                 }
 
-                // Bei Infokarten brauchen wir kein extra Feedbackfeld, da die Karte selbst die Erklärung ist
                 let explanationSegment = "";
                 if(q.type !== 'info') {
                     explanationSegment = `<div style="margin-top:15px; border-top: 1px dashed #cbd5e1; padding-top: 10px;">
-                        <label style="font-size:0.85rem; font-weight:600; color:#475569; display:block; margin-bottom:4px;">💡 Erklärung / Infotext (wird dem Schüler nach der Antwort angezeigt):</label>
-                        <input type="text" class="search-input" style="margin:0; background:#fcfffa; border-color:#bbf7d0;" value="${q.explanation || ''}" oninput="questionsArray[${index}].explanation=this.value" placeholder="Erklärung, Rechenweg oder zusätzliche Infos...">
+                        <label style="font-size:0.85rem; font-weight:600; color:#475569; display:block; margin-bottom:4px;">💡 Allgemeine Erklärung / Infotext (wird nach der Antwort angezeigt):</label>
+                        <input type="text" class="search-input" style="margin:0; background:#fcfffa; border-color:#bbf7d0;" id="explain-${index}" value="${q.explanation || ''}" placeholder="Erklärung, Rechenweg oder zusätzliche Infos...">
                     </div>`;
                 }
 
-                card.innerHTML = deleteBtn + commonHeader + imageUploadSegment + specificBody + explanationSegment;
+                card.innerHTML = deleteBtn + sortButtons + commonHeader + imageUploadSegment + specificBody + explanationSegment;
                 container.appendChild(card);
 
+                // Event Listener binden
                 document.getElementById(`input-text-${index}`).addEventListener('input', (e) => { questionsArray[index].questionText = e.target.value; });
+                if(q.type === 'multiple') {
+                    for(let o=0; o<4; o++) {
+                        document.getElementById(`opt-${index}-${o}`).addEventListener('input', (e) => { questionsArray[index].options[o] = e.target.value; });
+                    }
+                } else if(q.type === 'freetext') {
+                    document.getElementById(`free-${index}`).addEventListener('input', (e) => { questionsArray[index].correctTextAnswer = e.target.value; });
+                    
+                    if(q.subQuestions && q.subQuestions.length > 0) {
+                        q.subQuestions.forEach((sub, subIdx) => {
+                            document.getElementById(`sub-text-${index}-${subIdx}`).addEventListener('input', (e) => { questionsArray[index].subQuestions[subIdx].questionText = e.target.value; });
+                            document.getElementById(`sub-auth-${index}-${subIdx}`).addEventListener('input', (e) => { questionsArray[index].subQuestions[subIdx].correctTextAnswer = e.target.value; });
+                            document.getElementById(`sub-explain-${index}-${subIdx}`).addEventListener('input', (e) => { questionsArray[index].subQuestions[subIdx].explanation = e.target.value; });
+                        });
+                    }
+                } else if(q.type === 'video') {
+                    document.getElementById(`vid-${index}`).addEventListener('input', (e) => { questionsArray[index].videoUrl = e.target.value; });
+                }
+                if(q.type !== 'info') {
+                    document.getElementById(`explain-${index}`).addEventListener('input', (e) => { questionsArray[index].explanation = e.target.value; });
+                }
             });
         }
 
         async function saveCompleteQuizToServer() {
             const title = document.getElementById("quiz-title").value.trim();
             const visibility = document.getElementById("quiz-visibility").value;
-            if(!title) return alert("Titel fehlt!");
+            if(!title) return alert("Bitte gib einen Titel für das Quiz an!");
+
+            const cleanedQuestions = questionsArray.map(q => {
+                let explanationClean = q.explanation ? q.explanation.trim() : "";
+                let baseObj = { ...q, explanation: explanationClean, subQuestions: q.subQuestions || [] };
+
+                if(q.type === 'multiple') {
+                    let keptOpts = q.options.map(o => (o ? o.trim() : ""));
+                    return { ...baseObj, options: keptOpts };
+                }
+                return baseObj;
+            });
+
+            const saveBtn = document.getElementById("save-quiz-btn");
+            saveBtn.innerText = "⏳ Speichere...";
+            saveBtn.disabled = true;
 
             const payload = {
                 action: "saveQuiz",
-                quizId: currentEditingQuizId,
+                quizId: currentEditingQuizId || "",
                 title: title,
                 creator: currentUser.username,
                 visibility: visibility,
-                questions: questionsArray
+                questions: JSON.stringify(cleanedQuestions)
             };
 
-            const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
-            const data = await res.json();
-            if(data.success) {
-                alert("Erfolgreich in der Cloud gespeichert!");
-                fetchQuizListForSelector();
+            try {
+                const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
+                const data = await res.json();
+                if(data.success) {
+                    alert("Erfolgreich in der Cloud gespeichert!");
+                    if(!currentEditingQuizId) currentEditingQuizId = data.quizId;
+                    await fetchQuizListForSelector();
+                    document.getElementById("quiz-selector").value = currentEditingQuizId;
+                } else {
+                    alert("Fehler beim Speichern: " + data.message);
+                }
+            } catch(e) {
+                alert("Verbindungsfehler zur Cloud. Bitte erneut versuchen.");
+                console.error(e);
+            } finally {
+                saveBtn.innerText = "💾 Quiz speichern (Cloud)";
+                saveBtn.disabled = false;
             }
         }
         document.getElementById("logout-btn").addEventListener("click", () => { sessionStorage.clear(); window.location.href="login.html"; });
