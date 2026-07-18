@@ -71,3 +71,4 @@ body { background-color: #f0f2f5; color: #1e293b; padding-top: 80px; }
 @keyframes fadeIn { to { opacity: 1; } }
 @keyframes scaleUp { to { transform: scale(1); } }
 @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
